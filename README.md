@@ -81,3 +81,6 @@ That's it check your output folder for your images and metadata file.
 
 If you encounter any issues feel free to sent me a DM on my Twitter [@notluksus3D](https://twitter.com/notluksus3D)
 
+**Known issues**
+Some special characters may resolve in some "File couldnt be loaded" errors.
+Try to remove any special characters from your file paths to resolve.
