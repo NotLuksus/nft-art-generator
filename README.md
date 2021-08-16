@@ -3,6 +3,8 @@ This tool generates generative NFT art, based of all available traits.
 It was made with the intention to make the generative art field more accessible to anyone.  
 With this tool you don't need to be a programmer to create generative art.
 
+If you are interested in the creation of a full project, containing smart contract, website and image generation, please DM me on [Twitter](https://twitter.com/notluksus3D)
+
 
 **Features:**
 * Generate Images of an infinite amount of traits
