@@ -295,7 +295,7 @@ async function generateImages() {
   let id = 0;
   await generateWeightedTraits();
   if (deleteDuplicates) {
-    while (weightedTraits[0].length > 0 && noMoreMatches < 200) {
+    while (weightedTraits[0].length > 0 && noMoreMatches < 20000) {
       let picked = [];
       order.forEach(id => {
         let pickedImgId = pickRandom(weightedTraits[id]);
