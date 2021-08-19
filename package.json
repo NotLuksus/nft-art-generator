@@ -1,6 +1,6 @@
 {
   "name": "nft-art-generator",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A tool to generate generative NFT art projects.",
   "main": "bin/index.js",
   "repository": "https://github.com/NotLuksus/nft-art-generator",
