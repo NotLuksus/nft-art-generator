@@ -37,6 +37,8 @@ const getDirectories = source =>
     .filter(dirent => dirent.isDirectory())
     .map(dirent => dirent.name);
 
+const sleep = seconds => new Promise(resolve => setTimeout(resolve, seconds * 1000))
+
 //OPENING
 console.log(
   boxen(
@@ -71,35 +73,32 @@ async function main() {
   loadingDirectories.start();
   traits = getDirectories(basePath);
   traitsToSort = [...traits];
-  setTimeout(async () => {
-    loadingDirectories.succeed();
-    loadingDirectories.clear();
-    await traitsOrder(true);
-    await asyncForEach(traits, async trait => {
-      await setNames(trait);
-    });
-    await asyncForEach(traits, async trait => {
-      await setWeights(trait);
-    });
-    await generateImages();
-    const generatingImages = ora('Generating images');
-    generatingImages.color = 'yellow';
-    generatingImages.start();
-    setTimeout(async () => {
-      generatingImages.succeed('All images generated!');
-      generatingImages.clear();
-      if (generateMetadata) {
-        await writeMetadata();
-        const writingMetadata = ora('Exporting metadata');
-        writingMetadata.color = 'yellow';
-        writingMetadata.start();
-        setTimeout(() => {
-          writingMetadata.succeed('Exported metadata successfull');
-          writingMetadata.clear();
-        }, 500);
-      }
-    }, 2000);
-  }, 2000);
+  await sleep(2);
+  loadingDirectories.succeed();
+  loadingDirectories.clear();
+  await traitsOrder(true);
+  await asyncForEach(traits, async trait => {
+    await setNames(trait);
+  });
+  await asyncForEach(traits, async trait => {
+    await setWeights(trait);
+  });
+  await generateImages();
+  const generatingImages = ora('Generating images');
+  generatingImages.color = 'yellow';
+  generatingImages.start();
+  await sleep(2);
+  generatingImages.succeed('All images generated!');
+  generatingImages.clear();
+  if (generateMetadata) {
+    await writeMetadata();
+    const writingMetadata = ora('Exporting metadata');
+    writingMetadata.color = 'yellow';
+    writingMetadata.start();
+    await sleep(0.5);
+    writingMetadata.succeed('Exported metadata successfull');
+    writingMetadata.clear();
+  }
 }
 
 //GET THE BASEPATH FOR THE IMAGES
