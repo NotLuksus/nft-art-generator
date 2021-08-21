@@ -9,6 +9,7 @@ const boxen = require('boxen');
 const ora = require('ora');
 const inquirer = require('inquirer');
 const fs = require('fs');
+const { readFile, writeFile } = require("fs").promises;
 const mergeImages = require('merge-images');
 const { Image, Canvas } = require('canvas');
 const ImageDataURI = require('image-data-uri');
@@ -24,11 +25,12 @@ let names = {};
 let weightedTraits = [];
 let seen = [];
 let metaData = {};
-let name;
-let description;
-let imageUrl;
-let deleteDuplicates = true;
-let generateMetadata = true;
+let config = {
+  metaData: {},
+  deleteDuplicates: null,
+  generateMetadata: null,
+};
+let argv = require('minimist')(process.argv.slice(2));
 
 //DEFINITIONS
 const getDirectories = source =>
@@ -61,11 +63,12 @@ console.log(
 main();
 
 async function main() {
+  await loadConfig();
   await getBasePath();
   await getOutputPath();
   await checkForDuplicates();
   await generateMetadataPrompt();
-  if (generateMetadata) {
+  if (config.generateMetadata) {
     await metadataSettings();
   }
   const loadingDirectories = ora('Loading traits');
@@ -90,7 +93,7 @@ async function main() {
   await sleep(2);
   generatingImages.succeed('All images generated!');
   generatingImages.clear();
-  if (generateMetadata) {
+  if (config.generateMetadata) {
     await writeMetadata();
     const writingMetadata = ora('Exporting metadata');
     writingMetadata.color = 'yellow';
@@ -99,10 +102,17 @@ async function main() {
     writingMetadata.succeed('Exported metadata successfull');
     writingMetadata.clear();
   }
+  if (argv['save-config']) {
+    await writeConfig();
+  }
 }
 
 //GET THE BASEPATH FOR THE IMAGES
 async function getBasePath() {
+  if (config.basePath !== undefined) { 
+    basePath = config.basePath;
+    return;
+  }
   const { base_path } = await inquirer.prompt([
     {
       type: 'list',
@@ -128,10 +138,15 @@ async function getBasePath() {
     if (lastChar === '/') basePath = file_location;
     else basePath = file_location + '/';
   }
+  config.basePath = basePath;
 }
 
 //GET THE OUTPUTPATH FOR THE IMAGES
 async function getOutputPath() {
+  if (config.outputPath !== undefined) {
+    outputPath = config.outputPath
+    return;
+  }
   const { output_path } = await inquirer.prompt([
     {
       type: 'list',
@@ -158,9 +173,11 @@ async function getOutputPath() {
     if (lastChar === '/') outputPath = file_location;
     else outputPath = file_location + '/';
   }
+  config.outputPath = outputPath;
 }
 
 async function checkForDuplicates() {
+  if (config.deleteDuplicates !== null) return;
   let { checkDuplicates } = await inquirer.prompt([
     {
       type: 'confirm',
@@ -169,10 +186,11 @@ async function checkForDuplicates() {
         'Should duplicated images be deleted? (Might result in less images then expected)',
     },
   ]);
-  deleteDuplicates = checkDuplicates;
+  config.deleteDuplicates = checkDuplicates;
 }
 
 async function generateMetadataPrompt() {
+  if (config.generateMetadata !== null) return;
   let { createMetadata } = await inquirer.prompt([
     {
       type: 'confirm',
@@ -180,10 +198,11 @@ async function generateMetadataPrompt() {
       message: 'Should metadata be generated?',
     },
   ]);
-  generateMetadata = createMetadata;
+  config.generateMetadata = createMetadata;
 }
 
 async function metadataSettings() {
+  if (Object.keys(config.metaData).length !== 0) return;
   let responses = await inquirer.prompt([
     {
       type: 'input',
@@ -201,11 +220,11 @@ async function metadataSettings() {
       message: 'What should be the image url? (Generated format is URL/ID)',
     },
   ]);
-  name = responses.metadataName;
-  description = responses.metadataDescription;
+  config.metaData.name = responses.metadataName;
+  config.metaData.description = responses.metadataDescription;
   let lastChar = responses.metadataImageUrl.slice(-1);
-  if (lastChar === '/') imageUrl = responses.metadataImageUrl;
-  else imageUrl = responses.metadataImageUrl + '/';
+  if (lastChar === '/') config.imageUrl = responses.metadataImageUrl;
+  else config.imageUrl = responses.metadataImageUrl + '/';
 }
 
 //SELECT THE ORDER IN WHICH THE TRAITS SHOULD BE COMPOSITED
@@ -234,9 +253,11 @@ async function traitsOrder(isFirst) {
 
 //SET NAMES FOR EVERY TRAIT
 async function setNames(trait) {
+  names = config.names || names;
   const files = fs.readdirSync(basePath + '/' + trait);
   const namePrompt = [];
   files.forEach((file, i) => {
+    if (config.names && config.names[file] !== undefined) return;
     namePrompt.push({
       type: 'input',
       name: trait + '_name_' + i,
@@ -245,8 +266,10 @@ async function setNames(trait) {
   });
   const selectedNames = await inquirer.prompt(namePrompt);
   files.forEach((file, i) => {
+    if (config.names && config.names[file] !== undefined) return;
     names[file] = selectedNames[trait + '_name_' + i];
   });
+  config.names = {...config.names, ...names};
 }
 
 //SET WEIGHTS FOR EVERY TRAIT
@@ -293,7 +316,7 @@ async function generateImages() {
   let images = [];
   let id = 0;
   await generateWeightedTraits();
-  if (deleteDuplicates) {
+  if (config.deleteDuplicates) {
     while (weightedTraits[0].length > 0 && noMoreMatches < 20000) {
       let picked = [];
       order.forEach(id => {
@@ -370,9 +393,9 @@ function existCombination(contains) {
 
 function generateMetadataObject(id, images) {
   metaData[id] = {
-    name: name + '#' + id,
-    description: description,
-    image: imageUrl + id,
+    name: config.metaData.name + '#' + id,
+    description: config.metaData.description,
+    image: config.imageUrl + id,
     attributes: [],
   };
   images.forEach((image, i) => {
@@ -386,9 +409,16 @@ function generateMetadataObject(id, images) {
 }
 
 async function writeMetadata() {
-  fs.writeFile(outputPath + 'metadata.json', JSON.stringify(metaData), err => {
-    if (err) {
-      throw err;
-    }
-  });
+  await writeFile(outputPath + 'metadata.json', JSON.stringify(metaData));
+}
+
+async function loadConfig() {
+  try {
+    const data = await readFile('config.json')
+    config = JSON.parse(data.toString());
+  } catch (error) {}
+}
+
+async function writeConfig() {
+  await writeFile('config.json', JSON.stringify(config, null, 2));
 }
