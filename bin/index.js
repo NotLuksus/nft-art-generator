@@ -9,7 +9,7 @@ const boxen = require('boxen');
 const ora = require('ora');
 const inquirer = require('inquirer');
 const fs = require('fs');
-const { readFile, writeFile } = require("fs").promises;
+const { readFile, writeFile, readdir } = require("fs").promises;
 const mergeImages = require('merge-images');
 const { Image, Canvas } = require('canvas');
 const ImageDataURI = require('image-data-uri');
@@ -259,7 +259,7 @@ async function traitsOrder(isFirst) {
 //SET NAMES FOR EVERY TRAIT
 async function setNames(trait) {
   names = config.names || names;
-  const files = fs.readdirSync(basePath + '/' + trait);
+  const files = await getFilesForTrait(trait);
   const namePrompt = [];
   files.forEach((file, i) => {
     if (config.names && config.names[file] !== undefined) return;
@@ -283,7 +283,7 @@ async function setWeights(trait) {
     weights = config.weights;
     return;
   }
-  const files = fs.readdirSync(basePath + '/' + trait);
+  const files = await getFilesForTrait(trait);
   const weightPrompt = [];
   files.forEach((file, i) => {
     weightPrompt.push({
@@ -308,16 +308,16 @@ async function asyncForEach(array, callback) {
 
 //GENERATE WEIGHTED TRAITS
 async function generateWeightedTraits() {
-  traits.forEach(trait => {
+  for (const trait of traits) {
     const traitWeights = [];
-    const files = fs.readdirSync(basePath + '/' + trait);
+    const files = await getFilesForTrait(trait);
     files.forEach(file => {
       for (let i = 0; i < weights[file]; i++) {
         traitWeights.push(file);
       }
     });
     weightedTraits.push(traitWeights);
-  });
+  }
 }
 
 //GENARATE IMAGES
@@ -431,4 +431,8 @@ async function loadConfig() {
 
 async function writeConfig() {
   await writeFile('config.json', JSON.stringify(config, null, 2));
+}
+
+async function getFilesForTrait(trait) {
+  return (await readdir(basePath + '/' + trait)).filter(file => file !== '.DS_Store');
 }
