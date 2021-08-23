@@ -86,18 +86,18 @@ async function main() {
   await asyncForEach(traits, async trait => {
     await setWeights(trait);
   });
-  await generateImages();
   const generatingImages = ora('Generating images');
   generatingImages.color = 'yellow';
   generatingImages.start();
+  await generateImages();
   await sleep(2);
   generatingImages.succeed('All images generated!');
   generatingImages.clear();
   if (config.generateMetadata) {
-    await writeMetadata();
     const writingMetadata = ora('Exporting metadata');
     writingMetadata.color = 'yellow';
     writingMetadata.start();
+    await writeMetadata();
     await sleep(0.5);
     writingMetadata.succeed('Exported metadata successfully');
     writingMetadata.clear();
