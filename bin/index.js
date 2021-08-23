@@ -20,7 +20,7 @@ let outputPath;
 let traits;
 let traitsToSort = [];
 let order = [];
-let weights = [];
+let weights = {};
 let names = {};
 let weightedTraits = [];
 let seen = [];
@@ -229,6 +229,10 @@ async function metadataSettings() {
 
 //SELECT THE ORDER IN WHICH THE TRAITS SHOULD BE COMPOSITED
 async function traitsOrder(isFirst) {
+  if (config.order && config.order.length === traits.length) {
+    order = config.order;
+    return;
+  }
   const traitsPrompt = {
     type: 'list',
     name: 'selected',
@@ -245,6 +249,7 @@ async function traitsOrder(isFirst) {
   });
   const { selected } = await inquirer.prompt(traitsPrompt);
   order.push(selected);
+  config.order = order;
   let localIndex = traitsToSort.indexOf(traits[selected]);
   traitsToSort.splice(localIndex, 1);
   if (order.length === traits.length) return;
@@ -274,6 +279,10 @@ async function setNames(trait) {
 
 //SET WEIGHTS FOR EVERY TRAIT
 async function setWeights(trait) {
+  if (config.weights && Object.keys(config.weights).length === Object.keys(names).length ) {
+    weights = config.weights;
+    return;
+  }
   const files = fs.readdirSync(basePath + '/' + trait);
   const weightPrompt = [];
   files.forEach((file, i) => {
@@ -287,6 +296,7 @@ async function setWeights(trait) {
   files.forEach((file, i) => {
     weights[file] = selectedWeights[names[file] + '_weight'];
   });
+  config.weights = weights;
 }
 
 //ASYNC FOREACH
