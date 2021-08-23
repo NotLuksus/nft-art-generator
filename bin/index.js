@@ -99,11 +99,17 @@ async function main() {
     writingMetadata.color = 'yellow';
     writingMetadata.start();
     await sleep(0.5);
-    writingMetadata.succeed('Exported metadata successfull');
+    writingMetadata.succeed('Exported metadata successfully');
     writingMetadata.clear();
   }
   if (argv['save-config']) {
+    const writingConfig = ora('Saving configuration');
+    writingConfig.color = 'yellow';
+    writingConfig.start();
     await writeConfig();
+    await sleep(0.5);
+    writingConfig.succeed('Saved configuration successfully');
+    writingConfig.clear();
   }
 }
 
