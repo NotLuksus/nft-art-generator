@@ -225,9 +225,15 @@ async function metadataSettings() {
       name: 'metadataImageUrl',
       message: 'What should be the image url? (Generated format is URL/ID)',
     },
+    {
+      type: 'confirm',
+      name: 'splitFiles',
+      message: 'Should JSON metadata be split in multiple files?',
+    },
   ]);
   config.metaData.name = responses.metadataName;
   config.metaData.description = responses.metadataDescription;
+  config.metaData.splitFiles = responses.splitFiles;
   let lastChar = responses.metadataImageUrl.slice(-1);
   if (lastChar === '/') config.imageUrl = responses.metadataImageUrl;
   else config.imageUrl = responses.metadataImageUrl + '/';
@@ -425,7 +431,19 @@ function generateMetadataObject(id, images) {
 }
 
 async function writeMetadata() {
-  await writeFile(outputPath + 'metadata.json', JSON.stringify(metaData));
+  if(config.metaData.splitFiles)
+  {
+    let metadata_output_dir = outputPath + "metadata/"
+    if (!fs.existsSync(metadata_output_dir)) {
+      fs.mkdirSync(metadata_output_dir, { recursive: true });
+    }
+    for (var key in metaData){
+      await writeFile(metadata_output_dir + key, JSON.stringify(metaData[key]));
+    }
+  }else
+  {
+    await writeFile(outputPath + 'metadata.json', JSON.stringify(metaData));
+  }
 }
 
 async function loadConfig() {
