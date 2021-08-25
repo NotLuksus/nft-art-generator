@@ -9,6 +9,7 @@ const boxen = require('boxen');
 const ora = require('ora');
 const inquirer = require('inquirer');
 const fs = require('fs');
+const { readFile, writeFile, readdir } = require("fs").promises;
 const mergeImages = require('merge-images');
 const { Image, Canvas } = require('canvas');
 const ImageDataURI = require('image-data-uri');
@@ -19,16 +20,17 @@ let outputPath;
 let traits;
 let traitsToSort = [];
 let order = [];
-let weights = [];
+let weights = {};
 let names = {};
 let weightedTraits = [];
 let seen = [];
 let metaData = {};
-let name;
-let description;
-let imageUrl;
-let deleteDuplicates = true;
-let generateMetadata = true;
+let config = {
+  metaData: {},
+  deleteDuplicates: null,
+  generateMetadata: null,
+};
+let argv = require('minimist')(process.argv.slice(2));
 
 //DEFINITIONS
 const getDirectories = source =>
@@ -36,6 +38,8 @@ const getDirectories = source =>
     .readdirSync(source, { withFileTypes: true })
     .filter(dirent => dirent.isDirectory())
     .map(dirent => dirent.name);
+
+const sleep = seconds => new Promise(resolve => setTimeout(resolve, seconds * 1000))
 
 //OPENING
 console.log(
@@ -59,11 +63,12 @@ console.log(
 main();
 
 async function main() {
+  await loadConfig();
   await getBasePath();
   await getOutputPath();
   await checkForDuplicates();
   await generateMetadataPrompt();
-  if (generateMetadata) {
+  if (config.generateMetadata) {
     await metadataSettings();
   }
   const loadingDirectories = ora('Loading traits');
@@ -71,39 +76,49 @@ async function main() {
   loadingDirectories.start();
   traits = getDirectories(basePath);
   traitsToSort = [...traits];
-  setTimeout(async () => {
-    loadingDirectories.succeed();
-    loadingDirectories.clear();
-    await traitsOrder(true);
-    await asyncForEach(traits, async trait => {
-      await setNames(trait);
-    });
-    await asyncForEach(traits, async trait => {
-      await setWeights(trait);
-    });
-    await generateImages();
-    const generatingImages = ora('Generating images');
-    generatingImages.color = 'yellow';
-    generatingImages.start();
-    setTimeout(async () => {
-      generatingImages.succeed('All images generated!');
-      generatingImages.clear();
-      if (generateMetadata) {
-        await writeMetadata();
-        const writingMetadata = ora('Exporting metadata');
-        writingMetadata.color = 'yellow';
-        writingMetadata.start();
-        setTimeout(() => {
-          writingMetadata.succeed('Exported metadata successfull');
-          writingMetadata.clear();
-        }, 500);
-      }
-    }, 2000);
-  }, 2000);
+  await sleep(2);
+  loadingDirectories.succeed();
+  loadingDirectories.clear();
+  await traitsOrder(true);
+  await asyncForEach(traits, async trait => {
+    await setNames(trait);
+  });
+  await asyncForEach(traits, async trait => {
+    await setWeights(trait);
+  });
+  const generatingImages = ora('Generating images');
+  generatingImages.color = 'yellow';
+  generatingImages.start();
+  await generateImages();
+  await sleep(2);
+  generatingImages.succeed('All images generated!');
+  generatingImages.clear();
+  if (config.generateMetadata) {
+    const writingMetadata = ora('Exporting metadata');
+    writingMetadata.color = 'yellow';
+    writingMetadata.start();
+    await writeMetadata();
+    await sleep(0.5);
+    writingMetadata.succeed('Exported metadata successfully');
+    writingMetadata.clear();
+  }
+  if (argv['save-config']) {
+    const writingConfig = ora('Saving configuration');
+    writingConfig.color = 'yellow';
+    writingConfig.start();
+    await writeConfig();
+    await sleep(0.5);
+    writingConfig.succeed('Saved configuration successfully');
+    writingConfig.clear();
+  }
 }
 
 //GET THE BASEPATH FOR THE IMAGES
 async function getBasePath() {
+  if (config.basePath !== undefined) { 
+    basePath = config.basePath;
+    return;
+  }
   const { base_path } = await inquirer.prompt([
     {
       type: 'list',
@@ -129,10 +144,15 @@ async function getBasePath() {
     if (lastChar === '/') basePath = file_location;
     else basePath = file_location + '/';
   }
+  config.basePath = basePath;
 }
 
 //GET THE OUTPUTPATH FOR THE IMAGES
 async function getOutputPath() {
+  if (config.outputPath !== undefined) {
+    outputPath = config.outputPath
+    return;
+  }
   const { output_path } = await inquirer.prompt([
     {
       type: 'list',
@@ -159,9 +179,11 @@ async function getOutputPath() {
     if (lastChar === '/') outputPath = file_location;
     else outputPath = file_location + '/';
   }
+  config.outputPath = outputPath;
 }
 
 async function checkForDuplicates() {
+  if (config.deleteDuplicates !== null) return;
   let { checkDuplicates } = await inquirer.prompt([
     {
       type: 'confirm',
@@ -170,10 +192,11 @@ async function checkForDuplicates() {
         'Should duplicated images be deleted? (Might result in less images then expected)',
     },
   ]);
-  deleteDuplicates = checkDuplicates;
+  config.deleteDuplicates = checkDuplicates;
 }
 
 async function generateMetadataPrompt() {
+  if (config.generateMetadata !== null) return;
   let { createMetadata } = await inquirer.prompt([
     {
       type: 'confirm',
@@ -181,10 +204,11 @@ async function generateMetadataPrompt() {
       message: 'Should metadata be generated?',
     },
   ]);
-  generateMetadata = createMetadata;
+  config.generateMetadata = createMetadata;
 }
 
 async function metadataSettings() {
+  if (Object.keys(config.metaData).length !== 0) return;
   let responses = await inquirer.prompt([
     {
       type: 'input',
@@ -202,15 +226,19 @@ async function metadataSettings() {
       message: 'What should be the image url? (Generated format is URL/ID)',
     },
   ]);
-  name = responses.metadataName;
-  description = responses.metadataDescription;
+  config.metaData.name = responses.metadataName;
+  config.metaData.description = responses.metadataDescription;
   let lastChar = responses.metadataImageUrl.slice(-1);
-  if (lastChar === '/') imageUrl = responses.metadataImageUrl;
-  else imageUrl = responses.metadataImageUrl + '/';
+  if (lastChar === '/') config.imageUrl = responses.metadataImageUrl;
+  else config.imageUrl = responses.metadataImageUrl + '/';
 }
 
 //SELECT THE ORDER IN WHICH THE TRAITS SHOULD BE COMPOSITED
 async function traitsOrder(isFirst) {
+  if (config.order && config.order.length === traits.length) {
+    order = config.order;
+    return;
+  }
   const traitsPrompt = {
     type: 'list',
     name: 'selected',
@@ -227,6 +255,7 @@ async function traitsOrder(isFirst) {
   });
   const { selected } = await inquirer.prompt(traitsPrompt);
   order.push(selected);
+  config.order = order;
   let localIndex = traitsToSort.indexOf(traits[selected]);
   traitsToSort.splice(localIndex, 1);
   if (order.length === traits.length) return;
@@ -235,9 +264,11 @@ async function traitsOrder(isFirst) {
 
 //SET NAMES FOR EVERY TRAIT
 async function setNames(trait) {
-  const files = fs.readdirSync(basePath + '/' + trait);
+  names = config.names || names;
+  const files = await getFilesForTrait(trait);
   const namePrompt = [];
   files.forEach((file, i) => {
+    if (config.names && config.names[file] !== undefined) return;
     namePrompt.push({
       type: 'input',
       name: trait + '_name_' + i,
@@ -246,13 +277,19 @@ async function setNames(trait) {
   });
   const selectedNames = await inquirer.prompt(namePrompt);
   files.forEach((file, i) => {
+    if (config.names && config.names[file] !== undefined) return;
     names[file] = selectedNames[trait + '_name_' + i];
   });
+  config.names = {...config.names, ...names};
 }
 
 //SET WEIGHTS FOR EVERY TRAIT
 async function setWeights(trait) {
-  const files = fs.readdirSync(basePath + '/' + trait);
+  if (config.weights && Object.keys(config.weights).length === Object.keys(names).length ) {
+    weights = config.weights;
+    return;
+  }
+  const files = await getFilesForTrait(trait);
   const weightPrompt = [];
   files.forEach((file, i) => {
     weightPrompt.push({
@@ -265,6 +302,7 @@ async function setWeights(trait) {
   files.forEach((file, i) => {
     weights[file] = selectedWeights[names[file] + '_weight'];
   });
+  config.weights = weights;
 }
 
 //ASYNC FOREACH
@@ -276,16 +314,16 @@ async function asyncForEach(array, callback) {
 
 //GENERATE WEIGHTED TRAITS
 async function generateWeightedTraits() {
-  traits.forEach(trait => {
+  for (const trait of traits) {
     const traitWeights = [];
-    const files = fs.readdirSync(basePath + '/' + trait);
+    const files = await getFilesForTrait(trait);
     files.forEach(file => {
       for (let i = 0; i < weights[file]; i++) {
         traitWeights.push(file);
       }
     });
     weightedTraits.push(traitWeights);
-  });
+  }
 }
 
 //GENARATE IMAGES
@@ -294,7 +332,7 @@ async function generateImages() {
   let images = [];
   let id = 0;
   await generateWeightedTraits();
-  if (deleteDuplicates) {
+  if (config.deleteDuplicates) {
     while (weightedTraits[0].length > 0 && noMoreMatches < 20000) {
       let picked = [];
       order.forEach(id => {
@@ -371,9 +409,9 @@ function existCombination(contains) {
 
 function generateMetadataObject(id, images) {
   metaData[id] = {
-    name: name + '#' + id,
-    description: description,
-    image: imageUrl + id,
+    name: config.metaData.name + '#' + id,
+    description: config.metaData.description,
+    image: config.imageUrl + id,
     attributes: [],
   };
   images.forEach((image, i) => {
@@ -387,15 +425,20 @@ function generateMetadataObject(id, images) {
 }
 
 async function writeMetadata() {
-  let metadata_output_dir = outputPath + "metadata/"
-  if (!fs.existsSync(metadata_output_dir)) {
-    fs.mkdirSync(metadata_output_dir, { recursive: true });
-  }
-  for (var key in metaData){
-    fs.writeFile(metadata_output_dir + key, JSON.stringify(metaData[key]), err => {
-      if (err) {
-        throw err;
-      }
-    });
-  }
+  await writeFile(outputPath + 'metadata.json', JSON.stringify(metaData));
+}
+
+async function loadConfig() {
+  try {
+    const data = await readFile('config.json')
+    config = JSON.parse(data.toString());
+  } catch (error) {}
+}
+
+async function writeConfig() {
+  await writeFile('config.json', JSON.stringify(config, null, 2));
+}
+
+async function getFilesForTrait(trait) {
+  return (await readdir(basePath + '/' + trait)).filter(file => file !== '.DS_Store');
 }

@@ -16,7 +16,10 @@ If you are interested in the creation of a full project, containing smart contra
 `npm install -g nft-art-generator`
 
 **Usage**
-`nft-generate`
+`nft-generate [--save-config]`
+
+Options
+  - save-config: saves all entered values to a config.json file, which gets used in future runs
 
 **Documentation**  
 
