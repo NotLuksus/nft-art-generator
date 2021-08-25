@@ -315,7 +315,7 @@ async function generateImages() {
         });
         seen.push(images);
         const b64 = await mergeImages(images, { Canvas: Canvas, Image: Image });
-        await ImageDataURI.outputFile(b64, outputPath + `${id}.png`);
+        await ImageDataURI.outputFile(b64, outputPath + "images/" + `${id}.png`);
         images = [];
         id++;
       }
@@ -329,7 +329,7 @@ async function generateImages() {
       });
       generateMetadataObject(id, images);
       const b64 = await mergeImages(images, { Canvas: Canvas, Image: Image });
-      await ImageDataURI.outputFile(b64, outputPath + `${id}.png`);
+      await ImageDataURI.outputFile(b64, outputPath + "images/" + `${id}.png`);
       images = [];
       id++;
     }
@@ -387,9 +387,15 @@ function generateMetadataObject(id, images) {
 }
 
 async function writeMetadata() {
-  fs.writeFile(outputPath + 'metadata.json', JSON.stringify(metaData), err => {
-    if (err) {
-      throw err;
-    }
-  });
+  let metadata_output_dir = outputPath + "metadata/"
+  if (!fs.existsSync(metadata_output_dir)) {
+    fs.mkdirSync(metadata_output_dir, { recursive: true });
+  }
+  for (var key in metaData){
+    fs.writeFile(metadata_output_dir + key, JSON.stringify(metaData[key]), err => {
+      if (err) {
+        throw err;
+      }
+    });
+  }
 }
