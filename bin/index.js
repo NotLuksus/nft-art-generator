@@ -27,6 +27,7 @@ let seen = [];
 let metaData = {};
 let config = {
   metaData: {},
+  useCustomNames: null,
   deleteDuplicates: null,
   generateMetadata: null,
 };
@@ -80,6 +81,7 @@ async function main() {
   loadingDirectories.succeed();
   loadingDirectories.clear();
   await traitsOrder(true);
+  await customNamesPrompt();
   await asyncForEach(traits, async trait => {
     await setNames(trait);
   });
@@ -268,25 +270,49 @@ async function traitsOrder(isFirst) {
   await traitsOrder(false);
 }
 
+//SELECT IF WE WANT TO SET CUSTOM NAMES FOR EVERY TRAITS OR USE FILENAMES
+async function customNamesPrompt() {
+    if (config.useCustomNames !== null) return;
+    let { useCustomNames } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'useCustomNames',
+        message: 'How should be constructed the names of the traits?',
+        choices: [
+          { name: 'Use filenames as traits names', value: 0 },
+          { name: 'Choose custom names for each trait', value: 1 },
+        ],
+      },
+    ]);
+    config.useCustomNames = useCustomNames;
+}
+
 //SET NAMES FOR EVERY TRAIT
 async function setNames(trait) {
-  names = config.names || names;
-  const files = await getFilesForTrait(trait);
-  const namePrompt = [];
-  files.forEach((file, i) => {
-    if (config.names && config.names[file] !== undefined) return;
-    namePrompt.push({
-      type: 'input',
-      name: trait + '_name_' + i,
-      message: 'What should be the name of the trait shown in ' + file + '?',
+  if (config.useCustomNames) {
+    names = config.names || names;
+    const files = await getFilesForTrait(trait);
+    const namePrompt = [];
+    files.forEach((file, i) => {
+      if (config.names && config.names[file] !== undefined) return;
+      namePrompt.push({
+        type: 'input',
+        name: trait + '_name_' + i,
+        message: 'What should be the name of the trait shown in ' + file + '?',
+      });
     });
-  });
-  const selectedNames = await inquirer.prompt(namePrompt);
-  files.forEach((file, i) => {
-    if (config.names && config.names[file] !== undefined) return;
-    names[file] = selectedNames[trait + '_name_' + i];
-  });
-  config.names = {...config.names, ...names};
+    const selectedNames = await inquirer.prompt(namePrompt);
+    files.forEach((file, i) => {
+      if (config.names && config.names[file] !== undefined) return;
+      names[file] = selectedNames[trait + '_name_' + i];
+    });
+    config.names = {...config.names, ...names};
+  } else {
+    const files = fs.readdirSync(basePath + '/' + trait);
+    files.forEach((file, i) => {
+      names[file] = file.split('.')[0];
+    });
+  }
 }
 
 //SET WEIGHTS FOR EVERY TRAIT
