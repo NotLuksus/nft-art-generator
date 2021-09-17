@@ -328,6 +328,7 @@ async function setWeights(trait) {
       type: 'input',
       name: names[file] + '_weight',
       message: 'How many ' + names[file] + ' ' + trait + ' should there be?',
+      default: parseInt(Math.round(10000 / files.length)),
     });
   });
   const selectedWeights = await inquirer.prompt(weightPrompt);
