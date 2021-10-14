@@ -368,16 +368,22 @@ async function generateImages() {
   if (config.deleteDuplicates) {
     while (weightedTraits[0].length > 0 && noMoreMatches < 20000) {
       let picked = [];
+      var fail = false;
       order.forEach(id => {
         let pickedImgId = pickRandom(weightedTraits[id]);
         picked.push(pickedImgId);
         let pickedImg = weightedTraits[id][pickedImgId];
         if (pickedImg) {
-			images.push(basePath + traits[id] + '/' + pickedImg);
-		}
-		else {
-		}
+		images.push(basePath + traits[id] + '/' + pickedImg);
+	}
+	else {
+		fail=true;
+	}
       });
+      
+      if (fail == true) {
+      	break;
+      }
 
       if (existCombination(images)) {
         noMoreMatches++;
