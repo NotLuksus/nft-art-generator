@@ -366,7 +366,7 @@ async function generateImages() {
   let id = 0;
   await generateWeightedTraits();
   if (config.deleteDuplicates) {
-    while (weightedTraits[0].length > 0 && noMoreMatches < 20000) {
+    while (!Object.values(weightedTraits).filter(arr => arr.length == 0).length && noMoreMatches < 20000) {
       let picked = [];
       order.forEach(id => {
         let pickedImgId = pickRandom(weightedTraits[id]);
@@ -392,7 +392,7 @@ async function generateImages() {
       }
     }
   } else {
-    while (weightedTraits[0].length > 0) {
+    while (!Object.values(weightedTraits).filter(arr => arr.length == 0).length) {
       order.forEach(id => {
         images.push(
           basePath + traits[id] + '/' + pickRandomAndRemove(weightedTraits[id])
