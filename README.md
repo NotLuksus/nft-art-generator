@@ -73,7 +73,7 @@ Imagine it like the different layers in Photoshop and you are selecting the orde
 
 The next input lets you decide if you want to use filenames as traits names, or to define custom names for each trait.  
 
-If you selected the last option, you will enter a name for all you files.   
+If you selected the last option, you will enter a name for all your files.   
 These names will be used in the Metadata as well as in the script to make weighting the traits easier.  
 Example: If you have a file name bg1.png the script will ask you to name it. If its just a white background you could name it "White".
 
