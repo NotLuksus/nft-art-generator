@@ -26,6 +26,7 @@ Options
 
 Before you start, make sure your file structure looks something like this:
 
+```
 YOUR_PROJECT/  
 ├─ images/  
 │  ├─ trait1_name/  
@@ -41,6 +42,7 @@ YOUR_PROJECT/
 │  │  ├─ file6.png  
 │  │  ├─ ...  
 │  ├─ ...  
+```
 
 This is really important, since the scripts imports the traits based on the folder structure.
  
