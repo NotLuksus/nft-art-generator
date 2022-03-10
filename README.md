@@ -17,10 +17,11 @@ We offer any kind of Blockchain development, including collectible projects and 
 `npm install -g nft-art-generator`
 
 **Usage**
-`nft-generate [--save-config]`
+`nft-generate [--save-config] [--load-config filename]` 
 
 Options
   - save-config: saves all entered values to a config.json file, which gets used in future runs
+  - load-config: loads values from a specific json config file
 
 **Documentation**  
 

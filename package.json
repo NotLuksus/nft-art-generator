@@ -14,7 +14,7 @@
     "nft-generate": "./bin/index.js"
   },
   "dependencies": {
-    "boxen": "^5.0.1",
+    "boxen": "^5.1.2",
     "canvas": "^2.8.0",
     "chalk": "^4.1.1",
     "image-data-uri": "^2.0.1",

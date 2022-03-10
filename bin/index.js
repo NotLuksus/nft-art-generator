@@ -31,6 +31,8 @@ let config = {
   deleteDuplicates: null,
   generateMetadata: null,
 };
+let loadedConfig = false;
+
 let argv = require('minimist')(process.argv.slice(2));
 
 //DEFINITIONS
@@ -61,10 +63,18 @@ console.log(
     { borderColor: 'red', padding: 3 }
   )
 );
+
 main();
 
 async function main() {
-  await loadConfig();
+  if(argv['load-config']){
+    let file = argv['load-config'];
+  
+    await loadConfig(file);
+    loadedConfig = true;
+  }
+
+  await loadConfig("config.json");
   await getBasePath();
   await getOutputPath();
   await checkForDuplicates();
@@ -473,11 +483,15 @@ async function writeMetadata() {
   }
 }
 
-async function loadConfig() {
-  try {
-    const data = await readFile('config.json')
-    config = JSON.parse(data.toString());
-  } catch (error) {}
+async function loadConfig(file) {
+  if(loadedConfig == false){
+    try {
+      const data = await readFile(file)
+      config = JSON.parse(data.toString());
+    } catch (error) {
+      console.log("Could not load configuration file.");
+    }
+  }
 }
 
 async function writeConfig() {
