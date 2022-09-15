@@ -5,7 +5,8 @@
   "main": "bin/index.js",
   "repository": "https://github.com/NotLuksus/nft-art-generator",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node ./bin/index.js"
   },
   "keywords": [],
   "author": "NotLuksus",

@@ -11,8 +11,13 @@ const inquirer = require('inquirer');
 const fs = require('fs');
 const { readFile, writeFile, readdir } = require("fs").promises;
 const mergeImages = require('merge-images');
-const { Image, Canvas } = require('canvas');
+const { Image, Canvas, createCanvas } = require('canvas');
 const ImageDataURI = require('image-data-uri');
+
+
+//NFT Supply Count
+
+
 
 //SETTINGS
 let basePath;
@@ -25,13 +30,20 @@ let names = {};
 let weightedTraits = [];
 let seen = [];
 let metaData = {};
+let totalSupply = 100;
+let imageWidth = 500, imageHeight = 500;
 let config = {
   metaData: {},
   useCustomNames: null,
   deleteDuplicates: null,
   generateMetadata: null,
+  imageWidth: 0,
+  imageHeight: 0,
+  totalSupply: 0,
 };
 let loadedConfig = false;
+let canvas;
+let ctx ;
 
 let argv = require('minimist')(process.argv.slice(2));
 
@@ -64,17 +76,18 @@ console.log(
   )
 );
 
+
+
 main();
 
 async function main() {
   if(argv['load-config']){
     let file = argv['load-config'];
-  
     await loadConfig(file);
     loadedConfig = true;
   }
 
-  await loadConfig("config.json");
+  await getTotalSupply();
   await getBasePath();
   await getOutputPath();
   await checkForDuplicates();
@@ -82,6 +95,7 @@ async function main() {
   if (config.generateMetadata) {
     await metadataSettings();
   }
+  await getImageSize();
   const loadingDirectories = ora('Loading traits');
   loadingDirectories.color = 'yellow';
   loadingDirectories.start();
@@ -123,6 +137,37 @@ async function main() {
     writingConfig.succeed('Saved configuration successfully');
     writingConfig.clear();
   }
+}
+
+//GET IMAGE WIDTH AND HEIGHT
+async function getImageSize() {
+  if(config.imageHeight !== 0 && config.imageWidth !== 0) {
+    imageHeight = config.imageHeight;
+    imageWidth = config.imageWidth;
+    canvas = createCanvas(imageWidth, imageHeight);
+    ctx = canvas.getContext("2d");
+    return;
+  }
+  let responses = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'width',
+      message: 'What should be the width of the output image?',
+      default: 500,
+    },
+    {
+      type: 'input',
+      name: 'height',
+      message: 'What should be the height of the output image?',
+      default: 500,
+    }
+  ]);
+  imageWidth = parseInt(responses.width);
+  imageHeight = parseInt(responses.height);
+  config.imageWidth = imageWidth;
+  config.imageHeight = imageHeight;
+  canvas = createCanvas(imageWidth, imageHeight);
+  ctx = canvas.getContext("2d");
 }
 
 //GET THE BASEPATH FOR THE IMAGES
@@ -193,7 +238,23 @@ async function getOutputPath() {
   }
   config.outputPath = outputPath;
 }
-
+async function getTotalSupply() {
+  if(config.totalSupply !== 0) {
+    totalSupply = config.totalSupply;
+    return;
+  }
+  let { totalCount } = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'totalCount',
+      message:
+        'How many should total Count be?',
+      default: 100,
+    },
+  ]);
+  totalSupply = parseInt(totalCount);
+  config.totalSupply = totalSupply;
+}
 async function checkForDuplicates() {
   if (config.deleteDuplicates !== null) return;
   let { checkDuplicates } = await inquirer.prompt([
@@ -304,7 +365,7 @@ async function setNames(trait) {
     const files = await getFilesForTrait(trait);
     const namePrompt = [];
     files.forEach((file, i) => {
-      if (config.names && config.names[file] !== undefined) return;
+      if (config.names && config.names[file + trait] !== undefined) return;
       namePrompt.push({
         type: 'input',
         name: trait + '_name_' + i,
@@ -313,14 +374,14 @@ async function setNames(trait) {
     });
     const selectedNames = await inquirer.prompt(namePrompt);
     files.forEach((file, i) => {
-      if (config.names && config.names[file] !== undefined) return;
-      names[file] = selectedNames[trait + '_name_' + i];
+      if (config.names && config.names[file + trait] !== undefined) return;
+      names[file + trait] = selectedNames[trait + '_name_' + i];
     });
     config.names = {...config.names, ...names};
   } else {
     const files = fs.readdirSync(basePath + '/' + trait);
     files.forEach((file, i) => {
-      names[file] = file.split('.')[0];
+      names[file + trait] = file.split('.')[0];
     });
   }
 }
@@ -331,20 +392,73 @@ async function setWeights(trait) {
     weights = config.weights;
     return;
   }
+  let tmpTotalPercent = 100;
+  let sumSinglePercent = 0;
   const files = await getFilesForTrait(trait);
-  const weightPrompt = [];
-  files.forEach((file, i) => {
-    weightPrompt.push({
-      type: 'input',
-      name: names[file] + '_weight',
-      message: 'How many ' + names[file] + ' ' + trait + ' should there be?',
-      default: parseInt(Math.round(10000 / files.length)),
-    });
+  let standDefault = parseInt(Math.round(100 / files.length));
+  let i = 0;
+  for (const file of files) {
+    if(i == (files.length - 1)) {
+      standDefault = tmpTotalPercent;
+    }
+    i++;
+    let { singlePercent } = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'singlePercent',
+        message: 'How many ' + names[file + trait] + ' ' + trait + ' should there be? (%)',
+        default: standDefault,
+      },
+    ]);
+    singlePercent = parseFloat(singlePercent);
+    tmpTotalPercent = tmpTotalPercent - singlePercent;
+    tmpTotalPercent = Math.round(tmpTotalPercent * 100) / 100;
+    if(tmpTotalPercent < 0)
+      tmpTotalPercent = 0;
+    // weights[file + trait] = Math.round(totalSupply * singlePercent / 100);
+    sumSinglePercent += singlePercent;
+    weights[file + trait] = singlePercent;
+  };
+
+  i = 0;
+  let tmpTotalSupply = 0;
+  let indexArray = [];
+  files.forEach( file => {
+    id = file + trait;
+    indexArray[i] = id;
+    i ++;
+    let tmpSingleSupply = Math.floor(totalSupply * weights[id] / sumSinglePercent);
+    weights[id] = tmpSingleSupply;
+    tmpTotalSupply += tmpSingleSupply;
   });
-  const selectedWeights = await inquirer.prompt(weightPrompt);
-  files.forEach((file, i) => {
-    weights[file] = selectedWeights[names[file] + '_weight'];
-  });
+
+  i = 0;
+  if(tmpTotalSupply < totalSupply) {
+    while(tmpTotalSupply < totalSupply) {
+      if(i >= indexArray.length) {
+        i = 0;
+      }
+      if(weights[indexArray[i]] >= totalSupply) {
+        i++; continue;
+      }
+      weights[indexArray[i]]++;
+      i++;
+      tmpTotalSupply++;
+    }
+  }
+  if(tmpTotalSupply > totalSupply) {
+    while(tmpTotalSupply > totalSupply) {
+      if(i >= indexArray.length) {
+        i = 0;
+      }
+      if(weights[indexArray[i]] == 0) {
+        i++; continue;
+      }
+      weights[indexArray[i]]--;
+      i++;
+      tmpTotalSupply--;
+    }
+  }
   config.weights = weights;
 }
 
@@ -361,7 +475,7 @@ async function generateWeightedTraits() {
     const traitWeights = [];
     const files = await getFilesForTrait(trait);
     files.forEach(file => {
-      for (let i = 0; i < weights[file]; i++) {
+      for (let i = 0; i < weights[file + trait]; i++) {
         traitWeights.push(file);
       }
     });
@@ -369,6 +483,22 @@ async function generateWeightedTraits() {
   }
 }
 
+
+
+let currentGenerateId = 0;
+async function loadImage(imageB64) {
+  let img;
+  const imageLoadPromise = new Promise(resolve => {
+      img = new Image();
+      img.onload = resolve;
+      img.src = imageB64;
+  });
+
+  await imageLoadPromise;
+  ctx.drawImage(img, 0, 0, imageWidth, imageHeight);
+  await ImageDataURI.outputFile(ctx.canvas.toDataURL(), outputPath + `${currentGenerateId}.png`);
+  return img;
+}
 //GENARATE IMAGES
 async function generateImages() {
   let noMoreMatches = 0;
@@ -376,7 +506,7 @@ async function generateImages() {
   let id = 0;
   await generateWeightedTraits();
   if (config.deleteDuplicates) {
-    while (!Object.values(weightedTraits).filter(arr => arr.length == 0).length && noMoreMatches < 20000) {
+    while (!Object.values(weightedTraits).filter(arr => arr.length == 0).length && noMoreMatches < totalSupply) {
       let picked = [];
       order.forEach(id => {
         let pickedImgId = pickRandom(weightedTraits[id]);
@@ -396,7 +526,9 @@ async function generateImages() {
         });
         seen.push(images);
         const b64 = await mergeImages(images, { Canvas: Canvas, Image: Image });
-        await ImageDataURI.outputFile(b64, outputPath + `${id}.png`);
+
+        currentGenerateId = id;
+        await loadImage(b64);
         images = [];
         id++;
       }
@@ -410,7 +542,9 @@ async function generateImages() {
       });
       generateMetadataObject(id, images);
       const b64 = await mergeImages(images, { Canvas: Canvas, Image: Image });
-      await ImageDataURI.outputFile(b64, outputPath + `${id}.png`);
+
+      currentGenerateId = id;
+      await loadImage(b64);
       images = [];
       id++;
     }
@@ -462,7 +596,7 @@ function generateMetadataObject(id, images) {
     let fileToMap = pathArray[pathArray.length - 1];
     metaData[id].attributes.push({
       trait_type: traits[order[i]],
-      value: names[fileToMap],
+      value: names[fileToMap + traits[order[i]]],
     });
   });
 }
@@ -475,7 +609,7 @@ async function writeMetadata() {
       fs.mkdirSync(metadata_output_dir, { recursive: true });
     }
     for (var key in metaData){
-      await writeFile(metadata_output_dir + key, JSON.stringify(metaData[key]));
+      await writeFile(metadata_output_dir + key + ".json", JSON.stringify(metaData[key]));
     }
   }else
   {
