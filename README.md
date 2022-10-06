@@ -3,10 +3,6 @@ This tool generates generative NFT art, based of all available traits.
 It was made with the intention to make the generative art field more accessible to anyone.  
 With this tool you don't need to be a programmer to create generative art.
 
-If you are an artist interested bringing your work to the blockchain or interested in working on a project with us, please DM us on [Twitter](https://twitter.com/SphericonIO)
-We offer any kind of Blockchain development, including collectible projects and custom marketplaces for artists.
-
-
 **Features:**
 * Generate Images of an infinite amount of traits
 * Weight traits for different rarities
