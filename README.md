@@ -8,6 +8,7 @@ With this tool you don't need to be a programmer to create generative art.
 * Weight traits for different rarities
 * Remove duplicated combinations
 * Generate metadata for direct use on OpenSea
+* Add total supply and rarities works on different values (@devstar0718)
 
 **Installation**
 `npm install -g nft-art-generator`
